@@ -4,6 +4,9 @@ import tensorflow as tf
 nu = 0.05 # Viscosity of Burgers' equation
 T  = 0.5   # Final time of the simulationc
 
+# TODO: decide the number of qubits needed assigned to ChaakuDaaku
+# TODO: fix the NN flow assigned to swagle8987
+
 # Machine learning
 neurons = [10, 10, 10, 10, 10, 10] # Neural network layers
 nInputs = 2                  # Dimensionality of Burgers' eq.
@@ -33,7 +36,7 @@ def create_NN():
      weights = {
                'W1' : tf.Variable(tf.random.normal((nInputs,    neurons[0]), mean = 0.0, stddev = 1.0)), 
                'W2' : tf.Variable(tf.random.normal((neurons[0], neurons[1]), mean = 0.0, stddev = 1.0)),
-               'W3' : tf.   Variable(tf.random.normal((neurons[1], neurons[2]), mean = 0.0, stddev = 1.0)),
+               'W3' : tf.Variable(tf.random.normal((neurons[1], neurons[2]), mean = 0.0, stddev = 1.0)),
                'W4' : tf.Variable(tf.random.normal((neurons[2], neurons[3]), mean = 0.0, stddev = 1.0)),
                'W5' : tf.Variable(tf.random.normal((neurons[3], neurons[4]), mean = 0.0, stddev = 1.0)),
                'W6' : tf.Variable(tf.random.normal((neurons[4], neurons[5]), mean = 0.0, stddev = 1.0)),
