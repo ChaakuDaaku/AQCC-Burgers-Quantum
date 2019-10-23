@@ -1,0 +1,3 @@
+pennylane --upgrade
+pennylane-forest
+tensorflow==1.13.2
