@@ -1,35 +1,19 @@
 import pennylane as qml
 import tensorflow as tf
-
-"""
-The basic premise of this variational quantum circuit is to solve Partial Differential Equations.
-The process can be described as below:
-1. A quantum circuit is prepared which has the number of inputs and outputs equal to the PDE being
-   modelled((t,x) and u for 1D Burgers' Equation). (Don't know which gates to use)
-2. This quantum circuit is to be run to generate the NN, NN_shift and NN_init output, based on 3
-   different sets of inputs, and cost is to be calculated based on the DGM formula 13
-2. This quantum circuit is then "trained" using its trainable parameters using AdamOptimizer
-3. Finally the desired output should be received from this VQE
-"""
-
-import pennylane as qml
-import tensorflow as tf
-import time
 import numpy as np
-# Numerics
-nu = 0.05  # Viscosity of Burgers' equation
-T = 0.5   # Final time of the simulation
+import time
+import sympy
+import matplotlib.pyplot as plt
 
-# Training settings
-nSamples = 20000         # Number of random points to be sampled
-epochs = 2000            # Number of epochs
-learning_rate = 1.0e-3   # Learning rate
+nu = 0.05
+T = 0.5
 num_layers = 4
+nSamples = 2000
+epochs = 200
+learning_rate = 1.0e-4
+instants = [0.0, 0.25, 0.5]
 
-# Visualization parameters
-instants = [0.0, 0.25, 0.5]  # Time instants for plotting
-
-dev = qml.device("strawberryfields.fock", wires=2, cutoff_dim=10)
+dev = qml.device("strawberryfields.fock", wires=2)
 
 
 def layer(v):
@@ -48,58 +32,66 @@ def layer(v):
 
 
 @qml.qnode(dev, interface="tf")
-def circuit(var, x=None, num_wires=2):
-    # Encode input x into quantum state
-    qml.Displacement(x[:, 0], 0.0, wires=0)
-    qml.Displacement(x[:, 1], 0.0, wires=1)
+def circuit(var, x):
+    qml.Displacement(x[0], 0.0, wires=0)
+    qml.Displacement(x[1], 0.0, wires=1)
 
-    # "layer" subcircuits
     for v in var:
         layer(v)
 
     return qml.expval(qml.X(0))
 
 
-def train(costs):
-    return 0.49*tf.reduce_sum(input_tensor=tf.square(costs[0])) +\
-        0.01*tf.reduce_sum(input_tensor=tf.square(costs[1])) +\
-        0.5*tf.reduce_sum(input_tensor=tf.square(costs[2]))
-
-
-def cost(var, feats):
-
-    phi = tf.exp(-(feats[2][:, 0]-4*feats[2][:, 1])**2/(4*nu*(feats[2][:, 1]+1))) +\
-        tf.exp(-(feats[2][:, 0]-4*feats[2][:, 1]-2*np.pi)
-               ** 2/(4*nu*(feats[2][:, 1]+1)))
-    dphidx = tf.gradients(ys=phi, xs=feats[2])[0][:, 0]
-    U0 = -(2*nu/phi*dphidx)+4.0
-    U0 = tf.squeeze(U0)
-    preds = [circuit(var, f) for f in feats]
-    dQNdx = tf.gradients(ys=preds[0], xs=feats[0])[0][:, 0]
-    dQNdt = tf.gradients(ys=preds[0], xs=feats[0])[0][:, 1]
-    d2QNdx2 = tf.gradients(ys=dQNdx, xs=feats[0])[0][:, 0]
-
-    costs = [
-        dQNdt+tf.multiply(preds[0], dQNdx)-nu*d2QNdx2,
-        preds[1]-preds[0],
-        preds[2]-U0
-    ]
-    return train(costs)
-
-
 def create_mini_batch(X, batch_size=256):
     X_MB = []
     mb_index = np.random.choice(len(X), len(X), replace=False)
     X_shuffled = X[mb_index, :]
+
     for i in range(0, len(X), batch_size):
-        X_MB.append(tf.Variable(X_shuffled[i:i+batch_size, :]))
+        X_MB.append(X_shuffled[i: i+batch_size, :])
+
     return X_MB
 
+
+def j_theta(f, g, h):
+    phi = tf.math.exp(-(h[0]-4*h[1])**2/(4*nu*(h[1]+1))) +\
+        tf.math.exp(-(h[0]-4*h[1]-2*np.pi)**2/(4*nu*(h[1]+1)))
+    qn = circuit(var, f)
+    qn_shift = circuit(var, g)
+    qn_init = circuit(var, h)
+    with tf.GradientTape() as tape:
+        dphidx = tape.gradient(phi, h[0])
+        with tf.GradientTape() as tt:
+            dqndx, dqndt = tt.gradient(qn, f)
+        d2qndx2 = tape.gradient(dqndx, f[0])
+    u0 = -(2 * nu / phi * dphidx) + 4.0
+    c1 = (dqndt + (qn*dqndx - nu*d2qndx2))**2
+    c2 = (qn_shift - qn)**2
+    c3 = (qn_init - u0)**2
+    return c1, c2, c3
+
+
+def analytic_method():
+
+    X, T, NU = sympy.symbols('X T NU')
+    phi = sympy.exp(-(X - 4 * T) ** 2 / (4 * NU * (T + 1))) + \
+        sympy.exp(-(X - 4 * T - 2 * np.pi) ** 2 / (4 * NU * (T + 1)))
+    dphidx = phi.diff(X)
+
+    u_analytic_ = -2 * NU / phi * dphidx + 4
+    u_analytic = sympy.utilities.lambdify((X, T, NU), u_analytic_)
+
+    return u_analytic
+
+
 if __name__ == "__main__":
-    var = tf.Variable(0.05*tf.random.normal(num_layers, 14))
-    opt = tf.keras.optimizers.Adam(learning_rate)
+    var = tf.Variable(tf.random.normal((num_layers, 14), mean=0.0,
+                                    stddev=1.0), trainable=True, name="Theta")
+
+    print("Start Training")
+    start_time = time.time()
+
     for epoch in np.arange(epochs):
-        # Get random points inside domain
         inside_input = np.random.rand(nSamples, 2) * ([2 * np.pi, T])
         boundary_input = np.random.rand(nSamples, 2) * ([0.0, T])
         initial_input = np.random.rand(nSamples, 2) * ([2 * np.pi, 0.0])
@@ -108,6 +100,60 @@ if __name__ == "__main__":
         boundary_mb = create_mini_batch(boundary_input)
         initial_mb = create_mini_batch(initial_input)
 
-        for i_mb in range(len(inside_mb)):
-            epoch_data = [inside_mb[i_mb], boundary_mb[i_mb], initial_mb[i_mb]]
-            var = opt.step(lambda v: cost(v, epoch_data), var)
+        for i, j, k in zip(inside_mb, boundary_mb, initial_mb):
+            # Update weights over 79 mini batches
+            cost1, cost2, cost3 = 0.0, 0.0, 0.0
+            for f, g, h in zip(i, j, k):
+                # Sum over mini batch of 256
+                f, g, h = tf.Variable(f), tf.Variable(g), tf.Variable(h)
+                c1, c2, c3 = j_theta(f, g, h)
+                cost1, cost2, cost3 = cost1 + c1, cost2 + c2, cost3 + c3
+            loss = 0.49 * cost1 + 0.01 * cost2 + 0.5 * cost3
+            opt_op = tf.keras.optimizers.Adam(learning_rate).minimize(loss)
+            opt_op.run()
+
+        if epoch % 10 == 0:
+            tc1, tc2, tc3 = 0.0, 0.0, 0.0
+            # Calculate loss and print
+            for f, g, h in zip(inside_input, boundary_input, initial_input):
+                f, g, h = tf.Variable(f), tf.Variable(g), tf.Variable(h)
+                c1, c2, c3 = j_theta(f, g, h)
+                tc1, tc2, tc3 = tc1+c1, tc2+c2, tc3+c3
+            l = 0.49*tc1 + 0.01*tc2 + 0.5*tc3
+            print(f"Epoch: {epoch}, Loss {l}")
+
+        if epoch == epochs / 2:
+            learning_rate = learning_rate / 10
+
+    end_time = time.time()
+    print(f"Total Time {end_time - start_time}")
+
+    xtest = np.linspace(0, 2*np.pi, num=60, endpoint=True)
+    analytic = analytic_method()
+
+    plt.figure()
+    analytic_plot, qml_plot = [], []
+    colors = ['r', 'b', 'g']
+
+    for instant in instants:
+        ttest = np.ones(xtest.shape)*instant
+        xt = np.column_stack((xtest, ttest))
+        u_an = analytic(xtest, ttest, nu)
+        u_qn = [circuit(var, x) for x in xt]
+        cur_qn_plot = plt.plot(
+            xtest, u_qn, '.-', color=colors[instants.index(instant)])
+        cur_an_plot = plt.plot(
+            xtest, u_an, '-', color=colors[instants.index(instant)])
+        analytic_plot.append(cur_an_plot)
+        qml_plot.append(cur_qn_plot)
+
+    plots = [analytic_plot, qml_plot]
+    legend_time = plt.legend(
+        plots[0], ['t=0.0', 't=0.25', 't=0.5'], loc='upper left', numpoints=1)
+    plt.legend([m[0] for m in plots], ['Analytic', 'QML'])
+    plt.gca.add_artist(legend_time)
+    plt.grid(True)
+    plt.xlabel(r'$X[-]$')
+    plt.ylabel(r'$U[-]$')
+    plt.legend(fontsize=8, loc='lower left', numpoints=1)
+    plt.savefig(f'QNN_epoch_{epoch}.pdf', format=pdf)
