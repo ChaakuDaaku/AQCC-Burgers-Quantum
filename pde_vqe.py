@@ -84,7 +84,7 @@ def cost(var, feats):
         preds[1]-preds[0],
         preds[2]-U0
     ]
-    return loss(costs)
+    return train(costs)
 
 
 def create_mini_batch(X, batch_size=256):
