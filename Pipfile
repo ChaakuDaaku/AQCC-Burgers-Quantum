@@ -12,6 +12,8 @@ tensorflow = "*"
 pennylane = "*"
 matplotlib = "*"
 sympy = "*"
+strawberryfields = {editable = true,path = "./strawberryfields"}
+pennylane-sf = "*"
 
 [requires]
 python_version = "3.7"

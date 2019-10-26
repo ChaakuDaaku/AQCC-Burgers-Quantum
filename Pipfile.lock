@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "7a79831407c6c501b4e9ae252de708130704156f0062881a81b1e098558e737d"
+            "sha256": "056dd1d120828625dcfd6e11a7f864a6f471455bd485d671748dae36a7735a9b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -21,6 +21,12 @@
                 "sha256:d9129186431e150d7fe455f1cb1ecbb92bb5dba9da9bc3ef7b012d98c4db2526"
             ],
             "version": "==0.8.1"
+        },
+        "antlr4-python3-runtime": {
+            "hashes": [
+                "sha256:168cdcec8fb9152e84a87ca6fd261b3d54c8f6358f42ab3b813b14a7193bb50b"
+            ],
+            "version": "==4.7.2"
         },
         "appdirs": {
             "hashes": [
@@ -283,6 +289,14 @@
             "index": "pypi",
             "version": "==0.6.0"
         },
+        "pennylane-sf": {
+            "hashes": [
+                "sha256:3a2676c095d2b086ec59289f3894543c1e6fe63ae44c6c4839432b6afced66ca",
+                "sha256:60a669388d85bf837f3253f5d37264ba7f8decbd9ee921d4af51af66888afca7"
+            ],
+            "index": "pypi",
+            "version": "==0.6.0"
+        },
         "protobuf": {
             "hashes": [
                 "sha256:125713564d8cfed7610e52444c9769b8dcb0b55e25cc7841f2290ee7bc86636f",
@@ -318,6 +332,13 @@
             ],
             "version": "==2.8.0"
         },
+        "quantum-blackbird": {
+            "hashes": [
+                "sha256:0cec0c53f6b966a3f206e4e8539b7bbe8b24443f4ccc780f6c8ab2b6bd1992ad",
+                "sha256:fac686f5c3970b568d7672d7b41de01795790af1b5e973c4ddc6a287bc36cf75"
+            ],
+            "version": "==0.2.1"
+        },
         "scipy": {
             "hashes": [
                 "sha256:0baa64bf42592032f6f6445a07144e355ca876b177f47ad8d0612901c9375bef",
@@ -352,6 +373,10 @@
                 "sha256:d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73"
             ],
             "version": "==1.12.0"
+        },
+        "strawberryfields": {
+            "editable": true,
+            "path": "./strawberryfields"
         },
         "sympy": {
             "hashes": [
@@ -396,6 +421,21 @@
                 "sha256:1d6d69ce66211143803fbc56652b41d73b4a400a2891d7bf7a1cdf4c02de613b"
             ],
             "version": "==1.1.0"
+        },
+        "thewalrus": {
+            "hashes": [
+                "sha256:39e2647851ee17b4de9c5b3a349580e27a4ad2520de0c0f5fbb358cfccd6c556",
+                "sha256:725d66d18c2d5ab82f5562268ea5222a0d24145dbd163eba59d81a14d8131b6f",
+                "sha256:72ad0c4fc2d9ed53932ff99033fefc76cfbffa3987dd02ecd1c73340ecb49a81",
+                "sha256:7842937132d20c1c2e43a4e87de70f6b03bf49bd23a982b9fba0aef971a748a3",
+                "sha256:91f7d3a14a2fe14c683b14e687c581c7c5358af76829f743de15bbf82644dbb4",
+                "sha256:aaa5d931ebd0604c52a59099875a4b0415230fe3bb18e46b7fe83d1808f9b2ea",
+                "sha256:b8f94fb780b84af66e2c2739b6b864ab4f98177ece0cf86b52a3acf728805b7e",
+                "sha256:b90c24786993a3ead5d6ff376b9e4f30c69d7286086795a50b1399f7e6479960",
+                "sha256:bd5abc5c5db39d0fd0e3833bc7166835fd328b1a5106a104a858e64284e83c38",
+                "sha256:ce39ea06552f596bd14963770995c891e35636b888e0743481d55cecce1ad044"
+            ],
+            "version": "==0.8.0"
         },
         "toml": {
             "hashes": [
@@ -508,11 +548,11 @@
         },
         "pytest": {
             "hashes": [
-                "sha256:7e4800063ccfc306a53c461442526c5571e1462f61583506ce97e4da6a1d88c8",
-                "sha256:ca563435f4941d0cb34767301c27bc65c510cb82e90b9ecf9cb52dc2c63caaa0"
+                "sha256:27abc3fef618a01bebb1f0d6d303d2816a99aa87a5968ebc32fe971be91eb1e6",
+                "sha256:58cee9e09242937e136dbb3dab466116ba20d6b7828c7620f23947f37eb4dae4"
             ],
             "index": "pypi",
-            "version": "==5.2.1"
+            "version": "==5.2.2"
         },
         "six": {
             "hashes": [
