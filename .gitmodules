@@ -1,0 +1,3 @@
+[submodule "strawberryfields"]
+	path = strawberryfields
+	url = https://github.com/XanaduAI/strawberryfields.git

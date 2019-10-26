@@ -13,7 +13,7 @@ epochs = 200
 learning_rate = 1.0e-4
 instants = [0.0, 0.25, 0.5]
 
-dev = qml.device("strawberryfields.fock", wires=2)
+dev = qml.device("strawberryfields.fock", wires=2, cutoff_dim=10)
 
 
 def layer(v):
@@ -53,7 +53,7 @@ def create_mini_batch(X, batch_size=256):
     return X_MB
 
 
-def j_theta(f, g, h):
+def j_theta(var, f, g, h):
     phi = tf.math.exp(-(h[0]-4*h[1])**2/(4*nu*(h[1]+1))) +\
         tf.math.exp(-(h[0]-4*h[1]-2*np.pi)**2/(4*nu*(h[1]+1)))
     qn = circuit(var, f)
@@ -61,10 +61,13 @@ def j_theta(f, g, h):
     qn_init = circuit(var, h)
     with tf.GradientTape() as tape:
         dphidx = tape.gradient(phi, h[0])
-        with tf.GradientTape() as tt:
-            dqndx, dqndt = tt.gradient(qn, f)
-        d2qndx2 = tape.gradient(dqndx, f[0])
     u0 = -(2 * nu / phi * dphidx) + 4.0
+    with tf.GradientTape() as tape:
+        with tf.GradientTape() as tt:
+            _, input_grad = tt.gradient(qn, [var, f])
+            dqndx, dqndt = input_grad[0], input_grad[1]
+        _, input_grad2 = tape.gradient(dqndx, [var, f])
+        d2qndx2 = input_grad2[0]
     c1 = (dqndt + (qn*dqndx - nu*d2qndx2))**2
     c2 = (qn_shift - qn)**2
     c3 = (qn_init - u0)**2
@@ -86,8 +89,7 @@ def analytic_method():
 
 if __name__ == "__main__":
     var = tf.Variable(tf.random.normal((num_layers, 14), mean=0.0,
-                                    stddev=1.0), trainable=True, name="Theta")
-
+                                       stddev=1.0), trainable=True)
     print("Start Training")
     start_time = time.time()
 
@@ -106,7 +108,7 @@ if __name__ == "__main__":
             for f, g, h in zip(i, j, k):
                 # Sum over mini batch of 256
                 f, g, h = tf.Variable(f), tf.Variable(g), tf.Variable(h)
-                c1, c2, c3 = j_theta(f, g, h)
+                c1, c2, c3 = j_theta(var, f, g, h)
                 cost1, cost2, cost3 = cost1 + c1, cost2 + c2, cost3 + c3
             loss = 0.49 * cost1 + 0.01 * cost2 + 0.5 * cost3
             opt_op = tf.keras.optimizers.Adam(learning_rate).minimize(loss)
@@ -117,7 +119,7 @@ if __name__ == "__main__":
             # Calculate loss and print
             for f, g, h in zip(inside_input, boundary_input, initial_input):
                 f, g, h = tf.Variable(f), tf.Variable(g), tf.Variable(h)
-                c1, c2, c3 = j_theta(f, g, h)
+                c1, c2, c3 = j_theta(var, f, g, h)
                 tc1, tc2, tc3 = tc1+c1, tc2+c2, tc3+c3
             l = 0.49*tc1 + 0.01*tc2 + 0.5*tc3
             print(f"Epoch: {epoch}, Loss {l}")
