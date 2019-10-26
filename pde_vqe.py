@@ -156,4 +156,4 @@ if __name__ == "__main__":
     plt.xlabel(r'$X[-]$')
     plt.ylabel(r'$U[-]$')
     plt.legend(fontsize=8, loc='lower left', numpoints=1)
-    plt.savefig(f'QNN_epoch_{epoch}.pdf', format=pdf)
+    plt.savefig(f'QNN_epoch_{epoch}.pdf', format='pdf')
