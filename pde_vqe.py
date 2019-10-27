@@ -36,8 +36,8 @@ def circuit(var, x):
     qml.Displacement(x[0], 0.0, wires=0)
     qml.Displacement(x[1], 0.0, wires=1)
 
-    for v in var:
-        layer(v)
+    for i in range(var.shape[0]):
+        layer(var[i])
 
     return qml.expval(qml.X(0))
 
@@ -60,7 +60,7 @@ def j_theta(var, f, g, h):
     qn_shift = circuit(var, g)
     qn_init = circuit(var, h)
     with tf.GradientTape() as tape:
-        dphidx = tape.gradient(phi, h[0])
+        dphidx, dphidt = tape.gradient(phi, h)
     u0 = -(2 * nu / phi * dphidx) + 4.0
     with tf.GradientTape() as tape:
         with tf.GradientTape() as tt:
