@@ -55,7 +55,6 @@ def create_mini_batch(X, batch_size=256):
 
 def j_theta(var, f, g, h):
     phi = tf.math.exp(-(h[0]-4*h[1])**2/(4*nu*(h[1]+1)))
-    qn = circuit(var, f)
     qn_shift = circuit(var, g)
     qn_init = circuit(var, h)
     with tf.GradientTape() as tape:
@@ -64,10 +63,11 @@ def j_theta(var, f, g, h):
     u0 = -(2 * nu / phi * dphidx) + 4.0
     with tf.GradientTape() as tape:
         with tf.GradientTape() as tt:
-            _, input_grad = tt.gradient(qn, [var, f])
-            dqndx, dqndt = input_grad[0], input_grad[1]
-        _, input_grad2 = tape.gradient(dqndx, [var, f])
-        d2qndx2 = input_grad2[0]
+            qn = circuit(var, f)
+        _, input_grad = tt.gradient(qn, [var, f])
+        dqndx, dqndt = input_grad[0], input_grad[1]
+    _, input_grad2 = tape.gradient(dqndx, [var, f])
+    d2qndx2 = input_grad2[0]
     c1 = (dqndt + (qn*dqndx - nu*d2qndx2))**2
     c2 = (qn_shift - qn)**2
     c3 = (qn_init - u0)**2
