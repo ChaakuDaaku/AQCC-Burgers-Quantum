@@ -12,7 +12,6 @@ tensorflow = "*"
 pennylane = "*"
 matplotlib = "*"
 sympy = "*"
-strawberryfields = {editable = true,path = "./strawberryfields"}
 pennylane-sf = "*"
 
 [requires]

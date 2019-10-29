@@ -64,11 +64,9 @@ def j_theta(var, f, g, h):
     with tf.GradientTape() as tape:
         with tf.GradientTape() as tt:
             qn = circuit(var, f)
-        _, input_grad = tt.gradient(qn, [var, f])
-        dqndx, dqndt = input_grad[0], input_grad[1]
-    _, input_grad2 = tape.gradient(dqndx, [var, f])
-    d2qndx2 = input_grad2[0]
-    c1 = (dqndt + (qn*dqndx - nu*d2qndx2))**2
+        dqn = tf.Variable(tt.gradient(qn, f))
+    d2qndx2 = tape.gradient(dqn[0], f[0])
+    c1 = (dqn[1] + (qn*dqn[0] - nu*d2qndx2))**2
     c2 = (qn_shift - qn)**2
     c3 = (qn_init - u0)**2
     return c1, c2, c3

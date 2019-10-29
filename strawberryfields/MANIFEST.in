@@ -1,6 +1,0 @@
-include README.rst
-include doc/*
-include LICENSE
-include examples/*
-include tests/*
-include strawberryfields/backends/data/*
