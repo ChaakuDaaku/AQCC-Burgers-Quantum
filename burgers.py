@@ -1,61 +1,86 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import sympy
 import tensorflow as tf
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense
 
+'''
+t, x === [0,1]X[0,1]
+du/dt = (nu * d2u/dx2) - (alpha * u * du/dx)
+u(t, x==0) = a
+u(t ,x==1) = b
+u(t==0, x) = u0(x) Linear function 
+'''
 
 def create_dataset():
-    f = tf.random.uniform((20000, 2)) * ([2 * np.pi, 0.5])
-    g = tf.random.uniform((20000, 2)) * ([0., 0.5])
-    u = tf.random.uniform((20000, 2)) * ([2 * np.pi, 0.])
+    '''
+    t: [0, 1] * (f, g, u)
+    x: [0, 1] * (f, g, u)
+    nu: [1e-2, 1e-1] Viscosity
+    alp: [1e-2, 1]
+    a: [-1, 1] at x==0
+    b: [-1, 1] at x==1
+    gx: g(x) value of boundary condition
+    u0: u0(x) value of initial condition - linear function
+    u0(x) = y2-y1/x2-x1*(x-x1) + y1 -- y1=a, y2=b, x1=0, x2=1, x=u at t=0
+    '''
+    f = tf.random.uniform(shape=[20000, 2], minval=0., maxval=1.)
+    g_1 = tf.random.uniform(shape=[20000], minval=0., maxval=1.)
+    g_2 = tf.concat([tf.zeros([10000]), tf.ones([10000])], axis=0)
+    g = tf.stack([g_1, g_2], axis=1)
+    u = tf.random.uniform(shape=[20000, 2], minval=0., maxval=1.)*[0., 1.]
+    nu = tf.random.uniform(shape=[20000], minval=1e-2, maxval=1e-1)
+    alp = tf.random.uniform(shape=[20000], minval=1e-2, maxval=1.)
+    a = tf.random.uniform(shape=[20000], minval=-1., maxval=1.)
+    b = tf.random.uniform(shape=[20000], minval=-1., maxval=1.)
+    gx = tf.concat([a[:10000], b[10000:]], axis=0)
+    u0 = (b-a)*u[:, 1] + a
 
-    with tf.GradientTape() as tape:
-        tape.watch(u)
-        phi1 = tf.math.exp(-tf.math.square(u[:,0]-4*u[:,1])/(0.2*(u[:,1]+1)))
-        phi2 = tf.math.exp(-tf.math.square(u[:,0]-4*u[:,1]-2*np.pi)/(0.2*(u[:,1]+1)))
-        phi = phi1 + phi2
-    dphi = tape.gradient(phi, u)
-
-    dphidx = dphi[:,0]
-    u0 = -(2*0.05/phi*dphidx)+4.0
+    na = tf.stack([nu, alp], axis=1)
+    ab = tf.stack([a,b], axis=1)
+    f = tf.concat([f, na, ab], axis=1)
+    g = tf.concat([g, na, ab], axis=1)
+    u = tf.concat([u, na, ab], axis=1)
 
     batch_size = 64
-    train_dataset = tf.data.Dataset.from_tensor_slices((f, g, u, u0))
+    train_dataset = tf.data.Dataset.from_tensor_slices((f, g, u, nu, alp, gx, u0))
     train_dataset = train_dataset.shuffle(buffer_size=20000).batch(batch_size)
 
     return train_dataset
 
 
 def create_model():
-    inputs = Input(shape=(2,), name='digits')
+    inputs = Input(shape=(6,), name='digits')
     x = Dense(10, activation='tanh', name='dense_1')(inputs)
     x = Dense(10, activation='tanh', name='dense_2')(x)
     x = Dense(10, activation='tanh', name='dense_3')(x)
     x = Dense(10, activation='tanh', name='dense_4')(x)
     x = Dense(10, activation='tanh', name='dense_5')(x)
+    x = Dense(10, activation='tanh', name='dense_6')(x)
     outputs = Dense(1, activation='tanh', name='predictions')(x)
     model = Model(inputs=inputs, outputs=outputs)
 
-    optimizer = tf.keras.optimizers.Adam(0.01)
+    optimizer = tf.keras.optimizers.Adam(0.001)
 
     return model, optimizer
 
 
-def run(model, f_batch, g_batch, u_batch):
+def run(model, batch):
+    '''
+    batch = [f, g, u]
+    f.shape = (batch_size, 6) {t, x, nu, alp, a, b}
+    '''
     with tf.GradientTape() as t:
-        t.watch(f_batch)
+        t.watch(batch[0])
         with tf.GradientTape() as tape:
-            tape.watch(f_batch)
-            f_logits = model(f_batch)
-        df = tape.gradient(f_logits, f_batch)
-        dfdx = df[:, 0]
-        dfdt = df[:, 1]
-    dfdx2 = t.gradient(dfdx, f_batch)[:, 0]
+            tape.watch(batch[0])
+            f_logits = model(batch[0])
+        df = tape.gradient(f_logits, batch[0])[:, :2]
+        dfdt = df[:, 0]
+        dfdx = df[:, 1]
+    dfdx2 = t.gradient(dfdx, batch[0])[:, 1]
 
-    g_logits = model(g_batch)
-    u_logits = model(u_batch)
+    g_logits = model(batch[1])
+    u_logits = model(batch[2])
 
     f_logits = tf.squeeze(f_logits)
     g_logits = tf.squeeze(g_logits)
@@ -64,83 +89,57 @@ def run(model, f_batch, g_batch, u_batch):
     return (dfdt, dfdx, dfdx2), (f_logits, g_logits, u_logits)
 
 
-def loss_fn(u0_batch, diff, logits):
-    l1 = diff[0] + tf.math.multiply(logits[0], diff[1]) - 0.05 * diff[2]
-    l2 = logits[1] - logits[0]
-    l3 = logits[2] - u0_batch
-    l1 = tf.math.reduce_mean(tf.math.square(l1))
-    l2 = tf.math.reduce_mean(tf.math.square(l2))
-    l3 = tf.math.reduce_mean(tf.math.square(l3))
-    return 0.49*l1 + 0.01*l2 + 0.5*l3
+def loss_fn(diff, logits, vals):
+    '''
+    J(theta) = ||df/dt - Lf||^2 + ||f - g(x)||^2 + ||f - u0(x)||^2
+    Lf = nu * d2f/dx2 - alpha * f * df/dx
+
+    vals = [nu, alpha, g(x), u0(x)]
+    '''
+    l1 = diff[0] + vals[1] * logits[0] * diff[1] - vals[0] * diff[2]
+    l2 = logits[1] - vals[2]
+    l3 = logits[2] - vals[3]
+    l1 = tf.math.reduce_sum(tf.math.square(l1))
+    l2 = tf.math.reduce_sum(tf.math.square(l2))
+    l3 = tf.math.reduce_sum(tf.math.square(l3))
+    return l1 + l2 + l3
+
 
 def train():
     model, optimizer = create_model()
     print("Model Created")
 
-    epochs = 10
+    epochs = 50
     for epoch in range(epochs):
         train_dataset = create_dataset()
         print('Start of epoch %d' % (epoch,))
-        for step, (f_batch, g_batch, u_batch, u0_batch) in enumerate(train_dataset):
+        for step, batch in enumerate(train_dataset):
             with tf.GradientTape() as tape:
-                diff, logits = run(model, f_batch, g_batch, u_batch)
-                loss_value = loss_fn(u0_batch, diff, logits)
+                diff, logits = run(model, batch[:3])
+                loss_value = loss_fn(diff, logits, batch[3:])
             grads = tape.gradient(loss_value, model.trainable_weights)
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-            if step % 20 == 0:
+            if step % 75 == 0:
                 print('Training loss (for one batch) at step %s: %s' %
                     (step, float(loss_value)))
                 print('Seen so far: %s samples' % ((step + 1) * 64))
-
+    model.save('my_model.h5')
     return model
 
-def analytic_method():
-
-    X, T, NU = sympy.symbols('X T NU')
-    phi = sympy.exp(-(X - 4 * T) ** 2 / (4 * NU * (T + 1))) + \
-        sympy.exp(-(X - 4 * T - 2 * np.pi) ** 2 / (4 * NU * (T + 1)))
-    dphidx = phi.diff(X)
-
-    u_analytic_ = -2 * NU / phi * dphidx + 4
-    u_analytic = sympy.utilities.lambdify((X, T, NU), u_analytic_)
-
-    return u_analytic
-
-
 def plot(model):
-    instants = [0.0, 0.25, 0.5]
-    xtest = np.linspace(0, 2 * np.pi, num=60, dtype=np.float32)
-    analytic = analytic_method()
+    x = tf.linspace(0., 1., 60)
+    t = tf.ones_like(x)
+    nu = tf.ones_like(x) * 0.02
+    alp = tf.ones_like(x) * 0.95
+    a = tf.ones_like(x) * 0.9
+    b = tf.ones_like(x) * -0.9
+    X = tf.stack([t,x,nu,alp,a,b], axis=1)
+    F = model(X)
+
     plt.figure()
-    analytic_plot, ML_plot = [], []
-    colors = ['r', 'b', 'g']
-
-    for instant in instants:
-
-        ttest = np.ones(xtest.shape, dtype=np.float32) * instant
-        xt = tf.convert_to_tensor(np.column_stack((xtest, ttest)))
-        u_NN = model(xt)
-        u_analytic = analytic(xtest, ttest, 0.05)
-
-        current_ML_plot, = plt.plot(
-            xtest, u_NN, '.-', color=colors[instants.index(instant)])
-        current_analytic_plot, = plt.plot(
-            xtest, u_analytic, '-', color=colors[instants.index(instant)])
-
-        analytic_plot.append(current_analytic_plot)
-        ML_plot.append(current_ML_plot)
-
-    all_plots = [analytic_plot, ML_plot]
-    legend_time = plt.legend(
-        all_plots[0], ['t=0.0', 't=0.25', 't=0.5'], loc='upper left', numpoints=1)
-    plt.legend([method[0] for method in all_plots], ['Analytic', 'ML'])
-    plt.gca().add_artist(legend_time)
-    plt.grid(True)
-    plt.xlabel(r'$X[-]$')
-    plt.ylabel(r'$U[-]$')
-    plt.legend(fontsize=8, loc='lower left', numpoints=1)
-    plt.savefig('NN_visc_6x10_epoch_2000.pdf', format='pdf')
+    plt.plot(x, F)
+    plt.show()
 
 
 if __name__ == "__main__":
